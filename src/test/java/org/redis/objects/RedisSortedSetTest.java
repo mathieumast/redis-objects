@@ -1,9 +1,9 @@
 package org.redis.objects;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertNotNull;
@@ -17,11 +17,14 @@ import redis.clients.jedis.JedisPool;
  */
 public class RedisSortedSetTest {
 
-    public class ScoreableString implements Scoreable, Serializable {
+    public static class ScoreableString implements Scoreable {
 
         private String str;
 
         private double weight;
+
+        public ScoreableString() {
+        }
 
         public ScoreableString(String str, double weight) {
             this.str = str;
@@ -32,21 +35,39 @@ public class RedisSortedSetTest {
             return str;
         }
 
-        public void setStr(String str) {
-            this.str = str;
-        }
-
         public double getWeight() {
             return weight;
-        }
-
-        public void setWeight(double weight) {
-            this.weight = weight;
         }
 
         @Override
         public double score() {
             return weight;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 37 * hash + Objects.hashCode(this.str);
+            hash = 37 * hash + (int) (Double.doubleToLongBits(this.weight) ^ (Double.doubleToLongBits(this.weight) >>> 32));
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final ScoreableString other = (ScoreableString) obj;
+            if (!Objects.equals(this.str, other.str)) {
+                return false;
+            }
+            if (Double.doubleToLongBits(this.weight) != Double.doubleToLongBits(other.weight)) {
+                return false;
+            }
+            return true;
         }
     }
 
@@ -89,6 +110,17 @@ public class RedisSortedSetTest {
         list.add(new ScoreableString("a", 2));
         list.add(new ScoreableString("b", 1));
         assertTrue(set.containsAll(list));
+
+        list = new ArrayList<>();
+        list.add(new ScoreableString("a", 2));
+        list.add(new ScoreableString("b", 1));
+        list.add(new ScoreableString("d", 4));
+
+        set.retainAll(list);
+        assertEquals(2, set.size());
+
+        list = new ArrayList<>();
+        list.add(new ScoreableString("a", 2));
 
         set.removeAll(list);
         assertEquals(1, set.size());

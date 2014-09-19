@@ -53,6 +53,17 @@ public class RedisSetTest {
         list.add("a");
         list.add("b");
         assertTrue(set.containsAll(list));
+        
+        list = new ArrayList<>();
+        list.add("a");
+        list.add("b");
+        list.add("d");
+        
+        set.retainAll(list);
+        assertEquals(2, set.size());
+        
+        list = new ArrayList<>();
+        list.add("a");
 
         set.removeAll(list);
         assertEquals(1, set.size());

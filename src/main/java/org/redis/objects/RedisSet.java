@@ -11,6 +11,7 @@ import org.redis.objects.exceptions.RedisobjectsException;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.Transaction;
 import redis.clients.util.SafeEncoder;
 
 /**
@@ -42,7 +43,6 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
                     return l.intValue();
                 }
             }
-
         });
     }
 
@@ -65,15 +65,11 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
             public Boolean work(Jedis jedis) {
                 try {
                     Boolean exists = jedis.sismember(SafeEncoder.encode(name), valueToBytes((V) o));
-                    if (null == exists) {
-                        return false;
-                    }
-                    return exists;
+                    return null == exists ? false : exists;
                 } catch (IOException ex) {
                     throw new RedisobjectsException(ex);
                 }
             }
-
         });
     }
 
@@ -97,7 +93,6 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
                     throw new RedisobjectsException(ex);
                 }
             }
-
         });
     }
 
@@ -222,17 +217,18 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
      */
     @Override
     public boolean addAll(final Collection<? extends V> c) {
-        return pipelined(new PipelinedWork<Boolean>() {
+        return run(new Work<Boolean>() {
 
             @Override
-            public Boolean work(Pipeline pipeline) {
+            public Boolean work(Jedis jedis) {
+                Transaction tr = jedis.multi();
                 try {
-                    pipeline.multi();
                     for (V value : c) {
-                        pipeline.sadd(SafeEncoder.encode(name), valueToBytes(value));
+                        tr.sadd(SafeEncoder.encode(name), valueToBytes(value));
                     }
-                    pipeline.exec();
+                    tr.exec();
                 } catch (IOException ex) {
+                    tr.discard();
                     throw new RedisobjectsException(ex);
                 }
                 return true;
@@ -245,21 +241,27 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
      */
     @Override
     public boolean retainAll(final Collection<?> c) {
-        return pipelined(new PipelinedWork<Boolean>() {
+        return run(new Work<Boolean>() {
 
             @Override
-            public Boolean work(Pipeline pipeline) {
+            public Boolean work(Jedis jedis) {
+                boolean res = false;
+                Set<byte[]> list = jedis.smembers(SafeEncoder.encode(name));
+                Transaction tr = jedis.multi();
                 try {
-                    pipeline.multi();
-                    pipeline.del(SafeEncoder.encode(name));
-                    for (Object value : c) {
-                        pipeline.sadd(SafeEncoder.encode(name), valueToBytes((V) value));
+                    for (byte[] bytes : list) {
+                        V value = (V) bytesToValue(bytes);
+                        if (!c.contains(value)) {
+                            tr.srem(SafeEncoder.encode(name), bytes);
+                            res = true;
+                        }
                     }
-                    pipeline.exec();
-                } catch (IOException ex) {
+                    tr.exec();
+                } catch (IOException | ClassNotFoundException ex) {
+                    tr.discard();
                     throw new RedisobjectsException(ex);
                 }
-                return true;
+                return res;
             }
         });
     }
@@ -272,17 +274,18 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
      */
     @Override
     public boolean removeAll(final Collection<?> c) {
-        return pipelined(new PipelinedWork<Boolean>() {
+        return run(new Work<Boolean>() {
 
             @Override
-            public Boolean work(Pipeline pipeline) {
+            public Boolean work(Jedis jedis) {
+                Transaction tr = jedis.multi();
                 try {
-                    pipeline.multi();
                     for (Object object : c) {
-                        pipeline.srem(SafeEncoder.encode(name), valueToBytes((V) object));
+                        tr.srem(SafeEncoder.encode(name), valueToBytes((V) object));
                     }
-                    pipeline.exec();
+                    tr.exec();
                 } catch (IOException ex) {
+                    tr.discard();
                     throw new RedisobjectsException(ex);
                 }
                 return true;
@@ -302,7 +305,6 @@ public class RedisSet<V> extends RedisObject<V, V> implements Set<V> {
                 pipeline.del(SafeEncoder.encode(name));
                 return true;
             }
-
         });
     }
 }

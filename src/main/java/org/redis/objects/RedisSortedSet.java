@@ -11,6 +11,7 @@ import org.redis.objects.exceptions.RedisobjectsException;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.Transaction;
 import redis.clients.util.SafeEncoder;
 
 /**
@@ -105,7 +106,7 @@ public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> imple
             @Override
             public Object[] work(Jedis jedis) {
                 try {
-                    List<Object> list = new ArrayList<>();
+                    List<V> list = new ArrayList<>();
                     Set<byte[]> res = jedis.zrange(SafeEncoder.encode(name), 0, -1);
                     for (byte[] bytes : res) {
                         list.add(bytesToValue(bytes));
@@ -128,7 +129,7 @@ public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> imple
             @Override
             public T[] work(Jedis jedis) {
                 try {
-                    List<Object> list = new ArrayList<>();
+                    List<V> list = new ArrayList<>();
                     Set<byte[]> res = jedis.zrange(SafeEncoder.encode(name), 0, -1);
                     for (byte[] bytes : res) {
                         list.add(bytesToValue(bytes));
@@ -216,17 +217,18 @@ public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> imple
      */
     @Override
     public boolean addAll(final Collection<? extends V> c) {
-        return pipelined(new PipelinedWork<Boolean>() {
+        return run(new Work<Boolean>() {
 
             @Override
-            public Boolean work(Pipeline pipeline) {
+            public Boolean work(Jedis jedis) {
+                Transaction tr = jedis.multi();
                 try {
-                    pipeline.multi();
                     for (V value : c) {
-                        pipeline.zadd(SafeEncoder.encode(name), ((Scoreable) value).score(), valueToBytes((V) value));
+                        tr.zadd(SafeEncoder.encode(name), ((Scoreable) value).score(), valueToBytes((V) value));
                     }
-                    pipeline.exec();
+                    tr.exec();
                 } catch (IOException ex) {
+                    tr.discard();
                     throw new RedisobjectsException(ex);
                 }
                 return true;
@@ -239,21 +241,27 @@ public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> imple
      */
     @Override
     public boolean retainAll(final Collection<?> c) {
-        return pipelined(new PipelinedWork<Boolean>() {
+        return run(new Work<Boolean>() {
 
             @Override
-            public Boolean work(Pipeline pipeline) {
+            public Boolean work(Jedis jedis) {
+                boolean res = false;
+                Set<byte[]> list = jedis.zrange(SafeEncoder.encode(name), 0, -1);
+                Transaction tr = jedis.multi();
                 try {
-                    pipeline.multi();
-                    pipeline.del(SafeEncoder.encode(name));
-                    for (Object value : c) {
-                        pipeline.zadd(SafeEncoder.encode(name), ((Scoreable) value).score(), valueToBytes((V) value));
+                    for (byte[] bytes : list) {
+                        V value = (V) bytesToValue(bytes);
+                        if (!c.contains(value)) {
+                            tr.zrem(SafeEncoder.encode(name), bytes);
+                            res = true;
+                        }
                     }
-                    pipeline.exec();
-                } catch (IOException ex) {
+                    tr.exec();
+                } catch (IOException | ClassNotFoundException ex) {
+                    tr.discard();
                     throw new RedisobjectsException(ex);
                 }
-                return true;
+                return res;
             }
         });
     }
@@ -266,17 +274,18 @@ public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> imple
      */
     @Override
     public boolean removeAll(final Collection<?> c) {
-        return pipelined(new PipelinedWork<Boolean>() {
+        return run(new Work<Boolean>() {
 
             @Override
-            public Boolean work(Pipeline pipeline) {
+            public Boolean work(Jedis jedis) {
+                Transaction tr = jedis.multi();
                 try {
-                    pipeline.multi();
                     for (Object object : c) {
-                        pipeline.zrem(SafeEncoder.encode(name), valueToBytes((V) object));
+                        tr.zrem(SafeEncoder.encode(name), valueToBytes((V) object));
                     }
-                    pipeline.exec();
+                    tr.exec();
                 } catch (IOException ex) {
+                    tr.discard();
                     throw new RedisobjectsException(ex);
                 }
                 return true;
@@ -296,7 +305,6 @@ public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> imple
                 pipeline.del(SafeEncoder.encode(name));
                 return true;
             }
-
         });
     }
 }
