@@ -1,10 +1,11 @@
 package org.redis.objects;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import org.jboss.serial.io.JBossObjectInputStream;
-import org.jboss.serial.io.JBossObjectOutputStream;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Pipeline;
@@ -26,6 +27,8 @@ public abstract class RedisObject<K, V> {
     protected final String name;
 
     protected boolean syncImmediate = false;
+
+    private KryoPool kryoPool = new KryoPool();
     
     public RedisObject(final JedisPool jedisPool, final String name, Boolean syncImmediate, Integer maxWithoutSync, Integer delayBeforeSync) {
         this.jedisPool = jedisPool;
@@ -43,31 +46,45 @@ public abstract class RedisObject<K, V> {
     }
 
     protected byte[] valueToBytes(V object) throws IOException {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); JBossObjectOutputStream jbos = new JBossObjectOutputStream(baos)) {
-            jbos.writeObject(object);
+        Kryo kryo = kryoPool.get();
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); Output output = new Output(baos)) {
+            kryo.writeClassAndObject(output, object);
+            output.close();
             return baos.toByteArray();
+        } finally {
+            kryoPool.release(kryo);
         }
     }
 
     protected V bytesToValue(byte[] bytes) throws IOException, ClassNotFoundException {
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes); JBossObjectInputStream jbis = new JBossObjectInputStream(bais)) {
-            return (V) jbis.readObject();
+        Kryo kryo = kryoPool.get();
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes); Input input = new Input(bais)) {
+            return (V) kryo.readClassAndObject(input);
+        } finally {
+            kryoPool.release(kryo);
         }
     }
 
     protected byte[] keyToBytes(K key) throws IOException {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); JBossObjectOutputStream jbos = new JBossObjectOutputStream(baos)) {
-            jbos.writeObject(key);
+        Kryo kryo = kryoPool.get();
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream(); Output output = new Output(baos)) {
+            kryo.writeClassAndObject(output, key);
+            output.close();
             return baos.toByteArray();
+        } finally {
+            kryoPool.release(kryo);
         }
     }
 
     protected K bytesToKey(byte[] bytes) throws IOException, ClassNotFoundException {
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes); JBossObjectInputStream jbis = new JBossObjectInputStream(bais)) {
-            return (K) jbis.readObject();
+        Kryo kryo = kryoPool.get();
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes); Input input = new Input(bais)) {
+            return (K) kryo.readClassAndObject(input);
+        } finally {
+            kryoPool.release(kryo);
         }
     }
-    
+
     synchronized public void sync() {
         pipelineManager.sync();
     }
