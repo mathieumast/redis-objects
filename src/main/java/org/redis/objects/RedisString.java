@@ -2,6 +2,7 @@ package org.redis.objects;
 
 import lombok.experimental.Builder;
 import org.redis.objects.exceptions.RedisobjectsException;
+import org.redis.objects.serializer.Serializer;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Pipeline;
@@ -13,9 +14,13 @@ import redis.clients.jedis.Pipeline;
  */
 public class RedisString extends RedisObject<String, String> implements CharSequence {
 
+    public RedisString(final JedisPool jedisPool, final String name) {
+        this(jedisPool, name, null, null, null, null);
+    }
+    
     @Builder
-    public RedisString(final JedisPool jedisPool, final String name, boolean syncImmediate, Integer maxWithoutSync, Integer delayBeforeSync) {
-        super(jedisPool, name, syncImmediate, maxWithoutSync, delayBeforeSync);
+    public RedisString(final JedisPool jedisPool, final String name, Boolean syncImmediate, Integer maxWithoutSync, Integer delayBeforeSync, Serializer serializer) {
+        super(jedisPool, name, syncImmediate, maxWithoutSync, delayBeforeSync, serializer);
     }
 
     /**

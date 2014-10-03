@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 import lombok.experimental.Builder;
 import org.redis.objects.exceptions.RedisobjectsException;
+import org.redis.objects.serializer.Serializer;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Pipeline;
@@ -22,9 +23,13 @@ import redis.clients.util.SafeEncoder;
  */
 public class RedisSortedSet<V extends Scoreable> extends RedisObject<V, V> implements Set<V> {
 
+    public RedisSortedSet(final JedisPool jedisPool, final String name) {
+        this(jedisPool, name, null, null, null, null);
+    }
+    
     @Builder
-    public RedisSortedSet(final JedisPool jedisPool, final String name, boolean syncImmediate, Integer maxWithoutSync, Integer delayBeforeSync) {
-        super(jedisPool, name, syncImmediate, maxWithoutSync, delayBeforeSync);
+    public RedisSortedSet(final JedisPool jedisPool, final String name, Boolean syncImmediate, Integer maxWithoutSync, Integer delayBeforeSync, Serializer serializer) {
+        super(jedisPool, name, syncImmediate, maxWithoutSync, delayBeforeSync, serializer);
     }
 
     /**

@@ -1,4 +1,4 @@
-package org.redis.objects;
+package org.redis.objects.serializer.kryo;
 
 import com.esotericsoftware.kryo.Kryo;
 import java.util.Queue;
@@ -11,7 +11,16 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class KryoPool {
 
+    private static final KryoPool InternalKryoPool = new KryoPool();
+
     private final Queue<Kryo> kryos = new ConcurrentLinkedQueue<>();
+
+    private KryoPool() {
+    }
+
+    public static KryoPool getInstance() {
+        return InternalKryoPool;
+    }
 
     public Kryo get() {
         Kryo kryo;
