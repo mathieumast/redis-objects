@@ -8,7 +8,7 @@
     <packaging>jar</packaging>
 
     <name>redis-objects</name>
-    <url>https://github.com/mathieumast/redisobjects</url>
+    <url>https://github.com/mathieumast/redis-objects</url>
     
     <licenses>
         <license>
