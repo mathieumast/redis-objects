@@ -2,7 +2,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.mathieumast.redis-objects</groupId>
+    <groupId>com.github.mathieumast</groupId>
     <artifactId>redis-objects</artifactId>
     <version>1.0-RC1</version>
     <packaging>jar</packaging>
