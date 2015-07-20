@@ -16,7 +16,7 @@ import redis.clients.jedis.Transaction;
 import redis.clients.util.SafeEncoder;
 
 /**
- * Redis set.
+ * Redis sorted set.
  *
  * @author Mathieu MAST
  * @param <V>
